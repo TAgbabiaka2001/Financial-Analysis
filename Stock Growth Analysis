@@ -1,0 +1,83 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import os
+import certifi
+import yfinance as yf
+import datetime as dt
+
+from curl_cffi import requests # Requires 'pip install curl_cffi'
+
+# Use a session with SSL verification disabled
+with requests.Session(impersonate="chrome") as session:
+    session.verify = False 
+    ticker = yf.Ticker("MSFT", session=session)
+    print(ticker.info)
+
+Stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA']
+endDate = dt.datetime(2025,12,31)
+startDate = endDate - dt.timedelta(days=365*5)
+
+# Download historical data for the defined stocks
+portfolio = yf.download(tickers=Stocks, start = startDate, end = endDate)
+
+#Calculate log returns (daily returns)
+portfolio_Close = portfolio['Close']
+portfolio_returns = np.log(portfolio_Close / portfolio_Close.shift(1))
+
+# Calculate growth rate over the review period
+portfolio_Close.tail()['AAPL']
+last = round(portfolio_Close['AAPL'].iloc[-1], 2)
+first = round(portfolio_Close['AAPL'].iloc[0], 2)
+AAPL_growth = round(np.log(last / first), 2)
+AAPL_growth = AAPL_growth *100
+
+print(f"Last price: ${last}")
+print(f"First price: ${first}")
+
+print(f"AAPL growth rate: {AAPL_growth}%")
+print(f"AAPL has increased by "+str(AAPL_growth) + "% over the past 5 years.")
+
+# Hold or Sell Decision based on growth rate; Create column for $1,000 investment
+minimum_growth = 0.5  # Define your minimum acceptable growth rate here
+
+for closeprice in portfolio_Close['MSFT']:
+    last = portfolio_Close['MSFT'].iloc[-1]
+    first = portfolio_Close['MSFT'].iloc[0]
+    MSFT_growth = round(np.log(last / first), 2)
+    if MSFT_growth >= minimum_growth:
+        decision = "Hold"
+    else:
+        decision = "Sell"
+print(f"MSFT has increased by "+str(MSFT_growth*100) + "% over the past 5 years. Decision: " + decision)
+
+# Create function that automates the decision-making process for any stock ticker + returns a $1,000 investment result
+def stockanalyzer ( stock_ticker, start_date, end_date, investment_amount = 1000, min_growth_rate = 0.5):
+    # Download historical data for the defined stock
+    stock_data = yf.download(tickers=stock_ticker, start=start_date, end=end_date)
+
+    # Calculate growth rate over the review period
+    last_price = stock_data['Close'].iloc[-1]
+    first_price = stock_data['Close'].iloc[0]
+    growth_rate = float(np.log(last_price / first_price))
+    growth_rate = round(growth_rate *100, 2)
+    print (f"The growth rate of {stock_ticker} from {start_date} to {end_date} is: {growth_rate}%")
+
+    # Make Hold or Sell Decision based on growth rate
+    if growth_rate >= min_growth_rate:
+        decision = "Hold"
+    else:
+        decision = "Sell"
+
+    # Calculate investment value
+    investment_value = float(investment_amount * np.exp(growth_rate/100))
+    investment_value = round(investment_value,2)
+
+    return print(
+        f"Ticker: {stock_ticker}\n", 
+        f"Growth Rate: {growth_rate}\n",
+       f"Decision: {decision}\n", 
+        f"Investment Value: ${investment_value}"
+    );
+
+stockanalyzer ('GS', dt.date(2023,1,1), dt.date(2026,1,1),investment_amount=1000, min_growth_rate=0.50)
